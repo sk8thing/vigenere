@@ -7,8 +7,6 @@ typedef struct key_value_pair{
     int key, value;
 } Pair;
 
-size_t f_size;
-
 void remove_spacing(char *str){
     int i = 0, j = 0;
     while(str[i]){
@@ -34,8 +32,9 @@ char* get_key(char *str, int key_len){
     int i, j, k, n, len, bin_len, flag;
     float *scores[key_len], max;
     char *bins[key_len], *temp;
-    char *model = (char*) malloc(f_size);
-    char *key = (char*) calloc(key_len, sizeof(char));
+    char *model = (char*) malloc(sizeof(char) * strlen(str));
+    char *key = (char*) malloc(sizeof(char) * key_len + 1);
+    key[key_len] = '\0';
     strcpy(model, str);
     remove_spacing(model);
     len = strlen(model);
@@ -43,7 +42,7 @@ char* get_key(char *str, int key_len){
     temp = (char*) malloc(bin_len * sizeof(char));
     for(i = 0; i < key_len; i++){
         bins[i] = (char*) calloc(bin_len, sizeof(char));
-        scores[i] = (float*) calloc(26, sizeof(float));
+        scores[i] = (float*) calloc(25, sizeof(float));
     }
     for(i = 0; i < len; i++){
         for(j = 0; j < bin_len; j++){
@@ -90,8 +89,8 @@ char* get_key(char *str, int key_len){
 
 int find_key_length(char *str, float ratio){
     int i, j, k, len, max_val = 0, max_flag, *scores, *temp, sum = 0, avg, ctr;
-    char *model = (char*) malloc(f_size);
-    char *shifted = (char*) malloc(f_size);
+    char *model = (char*) malloc(sizeof(char) * strlen(str));
+    char *shifted = (char*) malloc(sizeof(char) * strlen(str));
     int *spikes = (int*) malloc(sizeof(int));
     int *spike_subs = (int*) malloc(sizeof(int));
     Pair *freqs = malloc(sizeof(Pair));
@@ -102,7 +101,7 @@ int find_key_length(char *str, float ratio){
     for(k = 1; k < len; k++){
         strcpy(shifted, model);
         shifted[len - k] = '\0';
-        for(i = 0, j = i + k; i < len - k; i++, j++){
+        for(i = 0, j = k; i < len - k; i++, j++){
             if(model[j] == shifted[i]){
                 scores[k]++;
             }
@@ -162,7 +161,7 @@ int find_key_length(char *str, float ratio){
     if(ctr >= 2){
         return max_flag;
     }
-    return -1;
+    return 0;
 }
 
 size_t get_fsize(FILE *file){
@@ -174,10 +173,11 @@ size_t get_fsize(FILE *file){
 
 int main(int argc, char* argv[]) {
     if(argc < 2){
-        printf("Example: %s [input file path] [output file path]", argv[0]);
+        printf("Example: %s [input file path]", argv[0]);
         exit(EINVAL);
     }
     FILE *file;
+    size_t f_size;
     char *text = NULL;
     int key_length;
     char *key;
@@ -191,7 +191,7 @@ int main(int argc, char* argv[]) {
     fscanf(file, "%[^\n]", text);
     fclose(file);
     text = strlwr(text);
-    key_length = (find_key_length(text, 3.0f) > 0) ? find_key_length(text, 3.0f) : find_key_length(text, 2.5f);
+    key_length = (find_key_length(text, 3.0f)) ? find_key_length(text, 3.0f) : find_key_length(text, 2.5f);
     if(key_length < 0){
         printf("COULDN\'T FIND KEY LENGTH");
         exit(255);

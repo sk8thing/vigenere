@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <errno.h>
+#define EOOR 255
 
 typedef struct key_value_pair{
     int key, value;
@@ -17,33 +19,31 @@ void remove_spacing(char *str){
 }
 
 void decrypt(char *str, char *key){
-    int i, j, len = strlen(key);
+    int i, j;
+    char l;
+    unsigned len = strlen(key);
     for(i = 0, j = 0; i < strlen(str); i++){
         if(!strchr("abcdefghijklmnopqrstuvwxyz", str[i])) continue;
-        str[i] -= key[j % len] - 'a';
+        l = key[j % len];
+        str[i] -= l - 'a';
         if(str[i] < 'a') str[i] = 'z' - ('a' - str[i]) + 1;
         j++;
     }
 }
 
 char* get_key(char *str, int key_len){
-    char letters[26] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'};
-    float values[26] = { 0.098f, 0.01f, 0.05f, 0.035f, 0.12f, 0.01f, 0.008f, 0.005f, 0.1f,  0.002f, 0.001f, 0.043f, 0.038f, 0.07f, 0.041f, 0.038f, 0.0f, 0.072f, 0.043f, 0.058f, 0.059f, 0.01f, 0.0f, 0.001f, 0.001f, 0.008f};
-    int i, j, k, n, len, bin_len, flag;
+    const char letters[26] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'};
+    const float values[26] = { 0.098f, 0.01f, 0.05f, 0.035f, 0.12f, 0.01f, 0.008f, 0.005f, 0.1f,  0.002f, 0.001f, 0.043f, 0.038f, 0.07f, 0.041f, 0.038f, 0.0f, 0.072f, 0.043f, 0.058f, 0.059f, 0.01f, 0.0f, 0.001f, 0.001f, 0.008f};
+    int i, j, k, n, bin_len, flag;
+    unsigned int len;
     float *scores[key_len], max;
-    char *bins[key_len], *temp;
-    char *model = (char*) malloc(sizeof(char) * strlen(str));
-    char *key = (char*) malloc(sizeof(char) * key_len + 1);
-    key[key_len] = '\0';
+    char *bins[key_len], *temp, *key;
+    char *model = (char*) malloc(sizeof(char) * strlen(str) + 1);
     strcpy(model, str);
     remove_spacing(model);
     len = strlen(model);
     bin_len = (int) ceil((float) len / (float) key_len);
-    temp = (char*) malloc(bin_len * sizeof(char));
-    for(i = 0; i < key_len; i++){
-        bins[i] = (char*) calloc(bin_len, sizeof(char));
-        scores[i] = (float*) calloc(25, sizeof(float));
-    }
+    for(i = 0; i < key_len; i++) bins[i] = (char*) calloc(bin_len, sizeof(char));
     for(i = 0; i < len; i++){
         for(j = 0; j < bin_len; j++){
             if(bins[i % key_len][j] == 0){
@@ -61,7 +61,9 @@ char* get_key(char *str, int key_len){
             }
         }
     }
+    temp = (char*) malloc(bin_len * sizeof(char));
     for(i = 0; i < key_len; i++){
+        scores[i] = (float*) calloc(26, sizeof(float));
         for(j = 0; j < 26; j++){
             strcpy(temp, bins[i]);
             for(k = 0; k < strlen(temp); k++){
@@ -71,6 +73,8 @@ char* get_key(char *str, int key_len){
             }
         }
     }
+    key = (char*) malloc(sizeof(char) * key_len + 1);
+    key[key_len] = '\0';
     for(i = 0; i < key_len; i++){
         free(bins[i]);
         max = 0.0f;
@@ -82,18 +86,18 @@ char* get_key(char *str, int key_len){
             }
         }
         key[i] = flag + 'a';
+        free(scores[i]);
     }
-    for(i = 0; i < key_len; i++) free(scores[i]);
     return key;
 }
 
-int find_key_length(char *str, float ratio){
-    int i, j, k, len, max_val = 0, max_flag, *scores, *temp, sum = 0, avg, ctr;
-    char *model = (char*) malloc(sizeof(char) * strlen(str));
-    char *shifted = (char*) malloc(sizeof(char) * strlen(str));
-    int *spikes = (int*) malloc(sizeof(int));
-    int *spike_subs = (int*) malloc(sizeof(int));
-    Pair *freqs = malloc(sizeof(Pair));
+int get_key_length(char *str, float ratio){
+    int i, j, k, max_val = 0, max_flag, *scores, *temp, *spikes, *spike_subs, sum = 0, avg, ctr;
+    unsigned int len;
+    char *model, *shifted;
+    Pair *freqs;
+    model = (char*) malloc(sizeof(char) * strlen(str) + 1);
+    shifted = (char*) malloc(sizeof(char) * strlen(str));
     strcpy(model, str);
     remove_spacing(model);
     len = strlen(model);
@@ -107,7 +111,10 @@ int find_key_length(char *str, float ratio){
             }
         }
     }
-    free(model), free(shifted);
+    free(model);
+    free(shifted);
+    spikes = (int*) malloc(sizeof(int));
+    spike_subs = (int*) malloc(sizeof(int));
     for(i = 1; i < len; i++) sum += scores[i];
     avg = (int) floor((float) sum / (float) len);
     for(i = 2, j = 1; i < len - 1; i++){
@@ -138,6 +145,7 @@ int find_key_length(char *str, float ratio){
             temp[i] = ctr;
         }
     }
+    freqs = malloc(sizeof(Pair));
     for(i = 0, j = 1; i < k - 1; i++){
         if(temp[i] != 0){
             freqs[j - 1].key = spike_subs[i];
@@ -146,7 +154,8 @@ int find_key_length(char *str, float ratio){
             freqs = realloc(freqs, sizeof(Pair) * j);
         }
     }
-    free(temp), free(spike_subs);
+    free(temp);
+    free(spike_subs);
     for(i = 0; i < j - 1; i++){
         if(freqs[i].value > max_val){
             max_val = freqs[i].value;
@@ -167,38 +176,48 @@ int find_key_length(char *str, float ratio){
 size_t get_fsize(FILE *file){
     fseek(file, 0, SEEK_END);
     size_t size = ftell(file);
-    fseek(file, 0, SEEK_SET);
+    rewind(file);
     return size;
 }
 
+char *file_to_buffer(FILE *file){
+    size_t f_size = get_fsize(file);
+    char *buf = (char*) malloc(f_size * sizeof(char) + 1);
+    buf[f_size] = '\0';
+    fread(buf, sizeof(char), f_size, file);
+    strlwr(buf);
+    return buf;
+}
+
 int main(int argc, char* argv[]) {
+    FILE *file;
+    int key_length;
+    char *text, *key;
     if(argc < 2){
-        printf("Example: %s [input file path]", argv[0]);
+        printf("Example: %s [input file path] [optional key]", argv[0]);
         exit(EINVAL);
     }
-    FILE *file;
-    size_t f_size;
-    char *text = NULL;
-    int key_length;
-    char *key;
-    file = fopen(argv[1], "r");
+    file = fopen(argv[1], "rb");
     if(!file){
         printf("Error: cannot open file.");
         exit(ENOENT);
     }
-    f_size = get_fsize(file) * sizeof(char) + 1;
-    text = (char*) malloc(f_size);
-    fscanf(file, "%[^\n]", text);
+    text = file_to_buffer(file);
     fclose(file);
-    text = strlwr(text);
-    key_length = (find_key_length(text, 3.0f)) ? find_key_length(text, 3.0f) : find_key_length(text, 2.5f);
-    if(key_length < 0){
+    if(argv[2]){
+        decrypt(text, argv[2]);
+        printf("%s", text);
+        return 0;
+    }
+    key_length = (get_key_length(text, 3.0f)) ? get_key_length(text, 3.0f) : get_key_length(text, 2.5f);
+    if(!key_length){
         printf("COULDN\'T FIND KEY LENGTH");
-        exit(255);
+        exit(EOOR);
     }
     key = get_key(text, key_length);
-    printf("KEY: %s", key);
+    printf("KEY: %s\n", key);
     decrypt(text, key);
-    printf("\n%s", text);
+    free(key);
+    printf("%s", text);
     return 0;
 }

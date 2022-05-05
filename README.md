@@ -7,9 +7,9 @@ You can download the executable from the release tab, or you can compile it your
 To run the application you need to create a text file containing the cipher text. 
 The cipher text should only contain letters from A-Z, diacritics, punctuation marks and other symbols should be unencrypted. 
 The length of the cipher text highly affects the success rate of decrypting, it should be around 200 characters minimum including whitespaces for a high probability of decrypting. 
-After creating the file, you can simply do
+After creating the file, you can simply do (providing a key argument only decrypts the text using it)
 ```
-./cvigenere.exe path/to/example.txt
+./cvigenere.exe path/to/example.txt key
 ```
 ## How it works
 The cryptanalysis of the Vigenere cipher is split up in 3 steps:
@@ -37,7 +37,7 @@ KFAKFAKFA
    KFAKFAKFA - lots of coincidences
 ```
 This is just an example.
-What happens in a real scenario is that even through the key repeats itself, there isn't a spike in the number of coincidences.
+What happens in a real scenario is that even though the key repeats itself, there isn't a spike in the number of coincidences.
 That's why the success rate highly depends on the length of the cipher text.
 Keep in mind that there can also be false positive results, when there's a high number of coincidences but the key doesn't repeat.
 The way the length of the key is determined is by looking for coincidence spikes that occur at same distance.
